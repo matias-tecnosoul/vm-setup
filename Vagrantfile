@@ -37,11 +37,33 @@ Vagrant.configure("2") do |config|
       vb.name = "vm-setup-arch"
     end
     
-    # Instalación mínima de Python (requerido por Ansible)
+    # Preparación específica para Arch Linux
     arch.vm.provision "shell", inline: <<-SHELL
-      # Solo instalar Python si no existe
+      # Instalar Python si no existe (requerido por Ansible)
       if [ ! -f /usr/bin/python3 ]; then
         pacman -Sy --noconfirm python
+      fi
+      
+      # Pre-instalar vagrant desde AUR para evitar fallo en el role
+      if ! command -v vagrant &> /dev/null; then
+        echo "Installing vagrant from AUR..."
+        
+        # Instalar dependencias para compilar
+        pacman -S --needed --noconfirm base-devel git
+        
+        # Crear usuario temporal para makepkg (no puede correr como root)
+        useradd -m builduser
+        echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+        
+        # Compilar e instalar vagrant
+        sudo -u builduser bash -c '
+          cd /tmp
+          git clone https://aur.archlinux.org/vagrant.git
+          cd vagrant
+          makepkg -si --noconfirm
+        '
+        
+        echo "Vagrant installed successfully from AUR"
       fi
     SHELL
     
@@ -52,7 +74,15 @@ Vagrant.configure("2") do |config|
       ansible.extra_vars = {
         ansible_user: "vagrant",
         ansible_python_interpreter: "/usr/bin/python3",
-        mw_tools_enabled: false
+        mw_tools_enabled: false,
+        # Override packages list without problematic ones
+        workstation_packages: [
+          "base-devel", "bzip2", "python", "openssh", "wget", "curl", 
+          "nmap", "jq", "unzip", "yamllint", "git", "git-lfs", "vim", 
+          "tmux", "openfortivpn", "openconnect", "shellcheck", "bind", 
+          "ppp", "haveged", "asciinema", "tree", "swaks", "podman", 
+          "zsh", "xsel", "xclip", "openssl"
+        ]
       }
     end
   end
