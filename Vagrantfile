@@ -44,6 +44,18 @@ Vagrant.configure("2") do |config|
         pacman -Sy --noconfirm python
       fi
       
+      # Configurar DNS para evitar problemas de conectividad
+      echo "nameserver 8.8.8.8" > /etc/resolv.conf
+      echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+      
+      # Actualizar llaves PGP y sistema
+      echo "Updating PGP keys and system..."
+      pacman-key --init
+      pacman-key --populate archlinux
+      pacman-key --refresh-keys
+      pacman -Sy --noconfirm archlinux-keyring
+      pacman -Su --noconfirm
+      
       # Pre-instalar vagrant desde AUR para evitar fallo en el role
       if ! command -v vagrant &> /dev/null; then
         echo "Installing vagrant from AUR..."
@@ -52,8 +64,10 @@ Vagrant.configure("2") do |config|
         pacman -S --needed --noconfirm base-devel git
         
         # Crear usuario temporal para makepkg (no puede correr como root)
-        useradd -m builduser
-        echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+        if ! id "builduser" &>/dev/null; then
+          useradd -m builduser
+          echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+        fi
         
         # Compilar e instalar vagrant
         sudo -u builduser bash -c '
